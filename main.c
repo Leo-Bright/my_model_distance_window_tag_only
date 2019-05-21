@@ -312,7 +312,8 @@ void LearnMpVocabFromTrainFile() {
     mp_vocab_size = 0;
     long long ith=0;
     int is_edge = 0;
-    while (1) {
+    int line = 0;   //mp 没有用上，所以之读取一行，缩短运行时间
+    while (line < 1) {
         ReadWord(edge, fin);
         if (feof(fin)) break;
         if (strcmp(edge, "\n") != 0) {
@@ -354,6 +355,7 @@ void LearnMpVocabFromTrainFile() {
         }
         is_edge = 0;
         ith = 0;
+        line++;
     }
 
     SortMpVocab();
@@ -726,79 +728,79 @@ void *TrainModelThread(void *id) {
 
                 //Learn by same node type relationship
 
-                target = node_seq[a];
-                context = node_seq[a+w];
-                mp_index = 0;
-
-                next_random = next_random * (unsigned long long)25214903917 + 11;
-                for (d = 0; d < negative + 1; d++) {
-                    if (d == 0) {
-                        label = 0;
-                        if (node2type[target] == node2type[context]) label = 1;
-                        if (node2type[target] == 1) label = 0;
-                        // negative sampling
-                    } else {
-                        next_random = next_random * (unsigned long long)25214903917 + 11;
-                        context = table[(next_random >> 16) % table_size];
-                        if (context == 0) context = next_random % (vocab_size - 1) + 1;
-                        if (context == target || context == node_seq[a+w]) continue;
-                        label = 0;
-                        if (node2type[target] == node2type[context]) label = 1;
-                        if (node2type[target] == 1) label = 0;
-                    }
-
-                    // training of a data
-                    lx = target * layer1_size;
-                    ly = context * layer1_size;
-                    lr = mp_index * layer1_size;
-                    for (c = 0; c < layer1_size; c++) ex[c] = 0;
-                    for (c = 0; c < layer1_size; c++) er[c] = 0;
-
-                    f = 0;
-                    for (c = 0; c < layer1_size; c++) {
-                        if (sigmoid_reg) {
-                            if (synmp[c + lr] > MAX_EXP) f += syn0[c + lx] * syn0[c + ly];
-                            else if (synmp[c + lr] < -MAX_EXP) continue;
-                            else f += syn0[c + lx] * syn0[c + ly] * expTable[(int)((synmp[c + lr] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-                        } else {
-                            if (synmp[c + lr] >= 0) f += syn0[c + lx] * syn0[c + ly];
-                        }
-                    }
-                    if (f > MAX_EXP) g = (label - 1) * alpha;
-                    else if (f < -MAX_EXP) g = (label - 0) * alpha;
-                    else g = (label - expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))]) * alpha;
-
-                    g = g * (1.0 - beta);
-
-                    // update
-                    for (c = 0; c < layer1_size; c++) {
-                        if (sigmoid_reg) {
-                            if (synmp[c + lr] > MAX_EXP) ex[c] = g * syn0[c + ly];
-                            else if (synmp[c + lr] < -MAX_EXP) continue;
-                            else ex[c] = g * syn0[c + ly] * expTable[(int)((synmp[c + lr] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-                        } else {
-                            if (synmp[c + lr] >= 0) ex[c] = g * syn0[c + ly];
-                        }
-                    }
-                    for (c = 0; c < layer1_size; c++) {
-                        f = synmp[c + lr];
-                        if (f > MAX_EXP || f < -MAX_EXP) continue;
-                        sigmoid = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-                        er[c] = g * syn0[c + lx] * syn0[c + ly] * sigmoid * (1-sigmoid);
-                    }
-                    for (c = 0; c < layer1_size; c++) {
-                        if (sigmoid_reg) {
-                            if (synmp[c + lr] > MAX_EXP) syn0[c + ly] += g * syn0[c + lx];
-                            else if (synmp[c + lr] < -MAX_EXP) continue;
-                            else syn0[c + ly] += g * syn0[c + lx] * expTable[(int)((synmp[c + lr] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
-                        } else {
-                            if (synmp[c + lr] >= 0) syn0[c + ly] += g * syn0[c + lx];
-                        }
-                    }
-                    for (c = 0; c < layer1_size; c++) syn0[c + lx] += ex[c];
-
-                    if (is_deepwalk == 0) {for (c = 0; c < layer1_size; c++) synmp[c + lr] += er[c];}
-                }
+//                target = node_seq[a];
+//                context = node_seq[a+w];
+//                mp_index = 0;
+//
+//                next_random = next_random * (unsigned long long)25214903917 + 11;
+//                for (d = 0; d < negative + 1; d++) {
+//                    if (d == 0) {
+//                        label = 0;
+//                        if (node2type[target] == node2type[context]) label = 1;
+//                        if (node2type[target] == 1) label = 0;
+//                        // negative sampling
+//                    } else {
+//                        next_random = next_random * (unsigned long long)25214903917 + 11;
+//                        context = table[(next_random >> 16) % table_size];
+//                        if (context == 0) context = next_random % (vocab_size - 1) + 1;
+//                        if (context == target || context == node_seq[a+w]) continue;
+//                        label = 0;
+//                        if (node2type[target] == node2type[context]) label = 1;
+//                        if (node2type[target] == 1) label = 0;
+//                    }
+//
+//                    // training of a data
+//                    lx = target * layer1_size;
+//                    ly = context * layer1_size;
+//                    lr = mp_index * layer1_size;
+//                    for (c = 0; c < layer1_size; c++) ex[c] = 0;
+//                    for (c = 0; c < layer1_size; c++) er[c] = 0;
+//
+//                    f = 0;
+//                    for (c = 0; c < layer1_size; c++) {
+//                        if (sigmoid_reg) {
+//                            if (synmp[c + lr] > MAX_EXP) f += syn0[c + lx] * syn0[c + ly];
+//                            else if (synmp[c + lr] < -MAX_EXP) continue;
+//                            else f += syn0[c + lx] * syn0[c + ly] * expTable[(int)((synmp[c + lr] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
+//                        } else {
+//                            if (synmp[c + lr] >= 0) f += syn0[c + lx] * syn0[c + ly];
+//                        }
+//                    }
+//                    if (f > MAX_EXP) g = (label - 1) * alpha;
+//                    else if (f < -MAX_EXP) g = (label - 0) * alpha;
+//                    else g = (label - expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))]) * alpha;
+//
+//                    g = g * (1.0 - beta);
+//
+//                    // update
+//                    for (c = 0; c < layer1_size; c++) {
+//                        if (sigmoid_reg) {
+//                            if (synmp[c + lr] > MAX_EXP) ex[c] = g * syn0[c + ly];
+//                            else if (synmp[c + lr] < -MAX_EXP) continue;
+//                            else ex[c] = g * syn0[c + ly] * expTable[(int)((synmp[c + lr] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
+//                        } else {
+//                            if (synmp[c + lr] >= 0) ex[c] = g * syn0[c + ly];
+//                        }
+//                    }
+//                    for (c = 0; c < layer1_size; c++) {
+//                        f = synmp[c + lr];
+//                        if (f > MAX_EXP || f < -MAX_EXP) continue;
+//                        sigmoid = expTable[(int)((f + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
+//                        er[c] = g * syn0[c + lx] * syn0[c + ly] * sigmoid * (1-sigmoid);
+//                    }
+//                    for (c = 0; c < layer1_size; c++) {
+//                        if (sigmoid_reg) {
+//                            if (synmp[c + lr] > MAX_EXP) syn0[c + ly] += g * syn0[c + lx];
+//                            else if (synmp[c + lr] < -MAX_EXP) continue;
+//                            else syn0[c + ly] += g * syn0[c + lx] * expTable[(int)((synmp[c + lr] + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))];
+//                        } else {
+//                            if (synmp[c + lr] >= 0) syn0[c + ly] += g * syn0[c + lx];
+//                        }
+//                    }
+//                    for (c = 0; c < layer1_size; c++) syn0[c + lx] += ex[c];
+//
+//                    if (is_deepwalk == 0) {for (c = 0; c < layer1_size; c++) synmp[c + lr] += er[c];}
+//                }
 
                 //Learn by same node tag relationship
 
@@ -896,7 +898,7 @@ void TrainModel() {
     last_alpha = alpha;
     LearnVocabFromTrainFile(); // 从输入的node sequence 里提取node的信息
     LearnMpVocabFromTrainFile();//
-    LoadTypeFromTypeFile();//提取node type
+//    LoadTypeFromTypeFile();//提取node type
     LoadTagFromTagFile();//提取node tag
     LoadLatFromLatFile();//提取node latitude
     LoadLonFromLonFile();//提取node lontitude
@@ -1032,7 +1034,7 @@ int main(int argc, char **argv) {
 
     vocab = (struct vocab_word *)calloc(vocab_max_size, sizeof(struct vocab_word));
     vocab_hash = (int *)calloc(vocab_hash_size, sizeof(int));
-    node2type = (int *)calloc(vocab_hash_size, sizeof(int));
+//    node2type = (int *)calloc(vocab_hash_size, sizeof(int));
     node2tag = (int *)calloc(vocab_hash_size, sizeof(int));
     node2lat = (real *)calloc(vocab_hash_size, sizeof(real));
     node2lon = (real *)calloc(vocab_hash_size, sizeof(real));
@@ -1053,7 +1055,7 @@ int main(int argc, char **argv) {
     DestroyNet();
     free(vocab_hash);
     free(mp_vocab_hash);
-    free(node2type);
+//    free(node2type);
     free(node2tag);
     free(node2lat);
     free(node2lon);
